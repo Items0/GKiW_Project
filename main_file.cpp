@@ -17,6 +17,8 @@ jeśli nie - napisz do Free Software Foundation, Inc., 59 Temple
 Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 */
 
+//test
+
 #define GLM_FORCE_RADIANS
 
 #include <GL/glew.h>
@@ -46,6 +48,12 @@ float speed=3.14;
 float z_camera_position = -3;
 float x_camera_position = 5;
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_RIGHT)x_camera_position -= 0.3;
+        if (key == GLFW_KEY_LEFT) x_camera_position += 0.3;
+        if (key == GLFW_KEY_UP) z_camera_position += 0.3;
+        if (key == GLFW_KEY_DOWN) z_camera_position -= 0.3;
+        }
     if (action == GLFW_REPEAT) {
         if (key == GLFW_KEY_RIGHT)x_camera_position -= 0.3;
         if (key == GLFW_KEY_LEFT) x_camera_position += 0.3;
@@ -73,9 +81,15 @@ void initOpenGLProgram(GLFWwindow* window) {
 
     std::vector<unsigned char> image;
 	unsigned width, height;
+<<<<<<< HEAD
+//	unsigned error = lodepng::decode(image, width, height, "blue_marble.png");
+	glGenTextures(1,&tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+=======
 	unsigned error = lodepng::decode(image, width, height, "blue_marble.png");;
 	glGenTextures(2,tex); // inicjacja 2 w tablicy
 	glBindTexture(GL_TEXTURE_2D, tex[0]); // wybranie uchwytu
+>>>>>>> refs/remotes/Items0/master
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
