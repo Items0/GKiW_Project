@@ -50,6 +50,12 @@ float speed=3.14;
 float z_camera_position = -3;
 float x_camera_position = 5;
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_RIGHT)x_camera_position -= 0.3;
+        if (key == GLFW_KEY_LEFT) x_camera_position += 0.3;
+        if (key == GLFW_KEY_UP) z_camera_position += 0.3;
+        if (key == GLFW_KEY_DOWN) z_camera_position -= 0.3;
+        }
     if (action == GLFW_REPEAT) {
         if (key == GLFW_KEY_RIGHT)x_camera_position -= 0.3;
         if (key == GLFW_KEY_LEFT) x_camera_position += 0.3;
@@ -74,7 +80,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 
     std::vector<unsigned char> image;
 	unsigned width, height;
-	unsigned error = lodepng::decode(image, width, height, "blue_marble.png");
+//	unsigned error = lodepng::decode(image, width, height, "blue_marble.png");
 	glGenTextures(1,&tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
