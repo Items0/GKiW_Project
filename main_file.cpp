@@ -30,6 +30,8 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 #include "lodepng.h"
 #include "constants.h"
 #include "allmodels.h"
+#include <process.h>
+
 
 using namespace glm;
 
@@ -966,6 +968,17 @@ glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glfwSwapBuffers(window); // zawsze ostatnie
 }
 
+//FUNKCJA WĄTKU
+void __cdecl ThreadProc( void * Args )
+{
+    int g_Counter = 0;
+    while( true){
+         g_Counter++;
+         std::cout<<g_Counter<<"\n";
+    }
+    _endthread();
+}
+
 int main(void)
 {
 	GLFWwindow* window; //Wskaźnik na obiekt reprezentujący okno
@@ -998,6 +1011,54 @@ int main(void)
 
 	float angle=0;
     glfwSetTime(0);
+
+
+//WCZYTYWANIE WIERZCHOŁKÓW I WEKTORÓW NORMALNYCH MODELU
+    std::vector < float > temp_vertices;
+    std::vector < float > temp_uvs;
+    std::vector < float > temp_normals;
+
+    int counter = 0;
+
+    FILE * file = fopen("04.obj","r");
+    if(file == NULL){
+        std::cout<<"Nie można wczytać pliku\n";
+    }
+    while(true){
+        char lineHeader[1000];
+        int res = fscanf(file,"%s",lineHeader);
+        if (res == EOF){
+            break;
+        }else if (strcmp(lineHeader,"v") == 0){//współrzędne wierzchołków
+            float x, y, z;
+            fscanf(file, "%f %f %f \n", &x, &y, &z);
+            temp_vertices.push_back(x);
+            temp_vertices.push_back(y);
+            temp_vertices.push_back(z);
+            counter++;
+        }else if (strcmp(lineHeader,"vn") == 0){//wektory normalne
+            float x, y, z;
+            fscanf(file, "%f %f %f \n", &x, &y, &z);
+            temp_normals.push_back(x);
+            temp_normals.push_back(y);
+            temp_normals.push_back(z);
+        }
+    }
+
+    if(temp_normals.size() == 0){
+        for(int i = 0; i<temp_vertices.size()-1; i++){
+            temp_normals.push_back(0.0f);
+        }
+    }
+
+//    for(int i =0; i<counter*3; i+=3){
+//        std::cout<<temp_vertices[i]<<" "<<temp_vertices[i+1]<<" "<<temp_vertices[i+2]<<" "<<i<<"\n";
+//    }
+//*********************************************************
+
+    //ODPALENIE WĄTKU (funkcja wątku, rozmiar stosu, argumenty przekazane do wątku)
+ //   _beginthread( ThreadProc, 0, NULL );
+
 	//Główna pętla
 	while (!glfwWindowShouldClose(window)) //Tak długo jak okno nie powinno zostać zamknięte
 	{
