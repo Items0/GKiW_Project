@@ -30,18 +30,38 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 #include "lodepng.h"
 #include "constants.h"
 #include "allmodels.h"
+#include "coords.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/glm.hpp>
+#include <string.h>
 
 using namespace glm;
 
 //zmienne globalne
 
-GLuint tex[20]; // uchwyt do tekstur
+const int tex_size = 50; // liczba textur
+GLuint tex[tex_size]; // uchwyt do tekstur
+
+std::vector<float> walkX;
+std::vector<float> walkZ;
+
 //Przetrzymywanie wierzcholkow modelu
+struct model{
     std::vector< glm::vec3 > vertices;
     std::vector< glm::vec2 > uvs;
-    std::vector< glm::vec3 > normals; // Won't be used at the moment.
+    std::vector< glm::vec3 > normals; // nieuzywane
+    float posX;
+    float posY;
+    float posZ;
+    float ray; // tylko dla tych po okregu
+    float angleX; // wszystkie katy w stopniach
+    float angleY;
+    float angleZ;
+    float scaleValue;
+};
+
+std::vector<model> myModels;
+
 //Procedura obsługi błędów
 void error_callback(int error, const char* description) {
 	fputs(description, stderr);
@@ -81,27 +101,61 @@ float speed=3.14;
 float x_camera_position = -5; //startowa pozycja X
 float z_camera_position = 6; //startowa pozycja Z
 double ANGLE = 0;
-float height = 3.0f;
-float barHeight = 2.0f;
-float pictureLowerBound = 0.5f;
-float pictureUpperBound = 2.5f;
+
+mat4 V, M;
+
+void loadTEX(std::string name, std::string description)
+{
+        static int amount = 0;
+        if (amount == 0)
+        {
+            glGenTextures(tex_size,tex);
+        }
+        std::vector<unsigned char> image;
+        unsigned width, height;
+        unsigned error = lodepng::decode(image, width, height, "textures/" + name);
+        glBindTexture(GL_TEXTURE_2D, tex[amount]);
+        glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glEnable(GL_TEXTURE_2D);
+        if (error == 0)
+        {
+            std::cout << amount<< "\t"  << name << "\t\t--" << description << std::endl;
+        }
+        else
+        {
+            std::cout << amount<< "\t"  << name << "\t\t--" << description << "\tERROR" << std::endl;
+        }
+        amount++;
+}
+
+void useTEX(int textureNumber, GLenum mode, float *vertices, float *textureCoords, int number)
+{
+    glBindTexture(GL_TEXTURE_2D,tex[textureNumber]);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, vertices);
+    glTexCoordPointer( 2, GL_FLOAT, 0, textureCoords);
+    glDrawArrays(mode,0,number);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+};
 
 
 //Wczytywanie OBJ
 bool loadOBJ(
-    const char * path,
-    std::vector < glm::vec3 > & out_vertices,
-    std::vector < glm::vec2 > & out_uvs,
-    std::vector < glm::vec3 > & out_normals
+    std::string name, std::string description
 )
 {
+    static int amount = 0;
     // wektory tymczasowe
     std::vector< unsigned int > vertexIndices, uvIndices, normalIndices;
     std::vector< glm::vec3 > temp_vertices;
     std::vector< glm::vec2 > temp_uvs;
     std::vector< glm::vec3 > temp_normals;
     // otwarcie pliku
-    FILE * file = fopen(path, "r");
+    FILE * file = fopen(("models/" + name).c_str(), "r");
     if( file == NULL ){
         printf("Impossible to open the file !\n");
         return false;
@@ -120,6 +174,7 @@ bool loadOBJ(
         else if ( strcmp( lineHeader, "vt" ) == 0 ){
         glm::vec2 uv;
         fscanf(file, "%f %f\n", &uv.x, &uv.y );
+        uv.y = 1 - uv.y; // export z blendera przechodzi poprawnie, uv != st    s == u, t = 1 - v
         temp_uvs.push_back(uv);
         }
         else if ( strcmp( lineHeader, "vn" ) == 0 ){
@@ -145,28 +200,71 @@ bool loadOBJ(
         normalIndices.push_back(normalIndex[1]);
         normalIndices.push_back(normalIndex[2]);
         }
+        model nowy;
+        myModels.push_back(nowy);
         for( unsigned int i=0; i<vertexIndices.size(); i++ ){
             unsigned int vertexIndex = vertexIndices[i];
             glm::vec3 vertex = temp_vertices[ vertexIndex-1 ];
-            out_vertices.push_back(vertex);
+            myModels[amount].vertices.push_back(vertex);
         }
         for( unsigned int i=0; i<uvIndices.size(); i++ ){
             unsigned int uvIndex = uvIndices[i];
             glm::vec2 vertex = temp_uvs[ uvIndex-1 ];
-            out_uvs.push_back(vertex);
+            myModels[amount].uvs.push_back(vertex);
         }
         for( unsigned int i=0; i<normalIndices.size(); i++ ){
             unsigned int normalIndex = normalIndices[i];
             glm::vec3 vertex = temp_normals[ normalIndex-1 ];
-            out_normals.push_back(vertex);
+            myModels[amount].normals.push_back(vertex);
         }
         vertexIndices.clear();
         uvIndices.clear();
         normalIndices.clear();
     }
-
+    std::cout << amount << "\t" << name << "\t\t--" << description << std::endl;
+    amount++;
 }
 
+void setModel(model & Model, float x, float y, float z, float ray = 0, float angleX = 0, float angleY = 0, float angleZ = 0, float scaleValue = 1)
+{
+    Model.posX = x;
+    Model.posY = y;
+    Model.posZ = z;
+    Model.ray = ray;
+    Model.angleX = angleX;
+    Model.angleY = angleY;
+    Model.angleZ = angleZ;
+    Model.scaleValue = scaleValue;
+}
+
+void useModel(int textureNumber,  GLenum mode, model &Model)
+{
+    float * wsk_vertices = glm::value_ptr(Model.vertices[0]);
+    float * wsk_uvs = glm::value_ptr(Model.uvs[0]);
+    float * wsk_normals = glm::value_ptr(Model.normals[0]); // cieniowanie
+
+    glBindTexture(GL_TEXTURE_2D,tex[textureNumber]);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnableClientState( GL_NORMAL_ARRAY );// cieniowanie
+
+    glVertexPointer(3, GL_FLOAT, 0, wsk_vertices);
+    glNormalPointer( GL_FLOAT, 0, wsk_normals);// cieniowanie
+    glTexCoordPointer( 2, GL_FLOAT, 0, wsk_uvs);
+
+    M = mat4(1.0f);
+    M = translate(M, vec3(Model.posX,Model.posY,Model.posZ));
+    M = rotate(M,Model.angleY * PI / 180,vec3(0, 1, 0));
+    M = rotate(M,Model.angleX * PI / 180,vec3(1, 0, 0));
+    M = rotate(M,Model.angleZ * PI / 180,vec3(0, 0, 1));
+    M = scale(M, vec3(Model.scaleValue, Model.scaleValue, Model.scaleValue));
+    glLoadMatrixf(glm::value_ptr(V*M));
+    glDrawArrays(mode, 0, Model.vertices.size());
+
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    //glDisableClientState( GL_NORMAL_ARRAY ); cieniowanie
+}
 
 void drawMatrix(){//minimapa w konsoli
     for(int i = 19; i >= 0; i--){
@@ -189,24 +287,6 @@ void drawMatrix(){//minimapa w konsoli
         std::cout<<"\n";
     }
     std::cout<<"Pozycja gracza : x="<<x_camera_position<<" z="<<z_camera_position<<"\n"<<"\n";
-}
-
-int mySinus(){
-    switch ((int)ANGLE){
-        case 0: return 0;
-        case 90: return 1;
-        case 180: return 0;
-        case 270: return -1;
-    }
-}
-
-int myCosinus(){
-    switch ((int)ANGLE){
-        case 0: return 1;
-        case 90: return 0;
-        case 180: return -1;
-        case 270: return 0;
-    }
 }
 
 void displayTrigonometrics(){
@@ -236,10 +316,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
         if (key == GLFW_KEY_UP){
             macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 0;
-            //std::cout<<"ruch przod"<< macierzRuchu[matrixPosition((x_camera_position-(float)cos(ANGLE*PI/180.0)))][matrixPosition((z_camera_position))]<< "\n";
             if(macierzRuchu[matrixPosition((x_camera_position-(float)cos(ANGLE*PI/180.0)))][matrixPosition((z_camera_position))]==0){
                 x_camera_position += -(float)cos(ANGLE*PI/180.0);
-                //std::cout<<"ruchx\n";
                 if(x_camera_position > 9.0f){
                     x_camera_position = 9.0f;
                 }else if(x_camera_position < -9.0f){
@@ -248,7 +326,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
             if(macierzRuchu[matrixPosition((x_camera_position))][matrixPosition((z_camera_position-(float)sin(ANGLE*PI/180.0)))]==0){
                 z_camera_position += -(float)sin(ANGLE*PI/180.0);
-                //std::cout<<"ruchz\n";
                 if(z_camera_position > 9.0f){
                     z_camera_position = 9.0f;
                 }else if(z_camera_position < -9.0f){
@@ -259,10 +336,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
         if (key == GLFW_KEY_DOWN){
             macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 0;
-            //std::cout<<"ruch przod"<< macierzRuchu[matrixPosition((x_camera_position+(float)cos(ANGLE*PI/180.0)))][matrixPosition((z_camera_position))]<< "\n";
             if(macierzRuchu[matrixPosition((x_camera_position+(float)cos(ANGLE*PI/180.0)))][matrixPosition((z_camera_position))]==0){
                 x_camera_position += (float)cos(ANGLE*PI/180.0);
-                //std::cout<<"ruchx\n";
                 if(x_camera_position > 9.0f){
                     x_camera_position = 9.0f;
                 }else if(x_camera_position < -9.0f){
@@ -271,7 +346,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
             if(macierzRuchu[matrixPosition((x_camera_position))][matrixPosition((z_camera_position+(float)sin(ANGLE*PI/180.0)))]==0){
                 z_camera_position += (float)sin(ANGLE*PI/180.0);
-                //std::cout<<"ruchz\n";
                 if(z_camera_position > 9.0f){
                     z_camera_position = 9.0f;
                 }else if(z_camera_position < -9.0f){
@@ -298,10 +372,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
         if (key == GLFW_KEY_UP){
             macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 0;
-            //std::cout<<"ruch przod"<< macierzRuchu[matrixPosition((x_camera_position-(float)cos(ANGLE*PI/180.0)*0.2))][matrixPosition((z_camera_position))]<< "\n";
             if(macierzRuchu[matrixPosition((x_camera_position-(float)cos(ANGLE*PI/180.0)))][matrixPosition((z_camera_position))]==0){
                 x_camera_position += -(float)cos(ANGLE*PI/180.0)*0.2;
-                //std::cout<<"ruchx\n";
                 if(x_camera_position > 9.0f){
                     x_camera_position = 9.0f;
                 }else if(x_camera_position < -9.0f){
@@ -310,7 +382,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
             if(macierzRuchu[matrixPosition((x_camera_position))][matrixPosition((z_camera_position-(float)sin(ANGLE*PI/180.0)*0.2))]==0){
                 z_camera_position += -(float)sin(ANGLE*PI/180.0)*0.2;
-                //std::cout<<"ruchz\n";
                 if(z_camera_position > 9.0f){
                     z_camera_position = 9.0f;
                 }else if(z_camera_position < -9.0f){
@@ -321,10 +392,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
         if (key == GLFW_KEY_DOWN){
             macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 0;
-           //std::cout<<"ruch przod"<< macierzRuchu[matrixPosition((x_camera_position+(float)cos(ANGLE*PI/180.0)*0.2))][matrixPosition((z_camera_position))]<< "\n";
             if(macierzRuchu[matrixPosition((x_camera_position+(float)cos(ANGLE*PI/180.0)*0.2))][matrixPosition((z_camera_position))]==0){
                 x_camera_position += (float)cos(ANGLE*PI/180.0)*0.2;
-                //std::cout<<"ruchx\n";
                 if(x_camera_position > 9.0f){
                     x_camera_position = 9.0f;
                 }else if(x_camera_position < -9.0f){
@@ -333,7 +402,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
             if(macierzRuchu[matrixPosition((x_camera_position))][matrixPosition((z_camera_position+(float)sin(ANGLE*PI/180.0)*0.2))]==0){
                 z_camera_position += (float)sin(ANGLE*PI/180.0)*0.2;
-                //std::cout<<"ruchz\n";
                 if(z_camera_position > 9.0f){
                     z_camera_position = 9.0f;
                 }else if(z_camera_position < -9.0f){
@@ -343,15 +411,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 1;
         }
     }
-    //drawMatrix();
-/*if (action == GLFW_RELEASE)
-{
-    if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) speed = 0;
-}*/
 }
 //Procedura inicjująca
 void initOpenGLProgram(GLFWwindow* window) {
-    bool res = loadOBJ("d.obj", vertices, uvs, normals); // wczytanie
+    std::cout << "Models: " << std::endl;
+    loadOBJ("cylindroman.obj", "latajacy dookola");
+    loadOBJ("monument.obj", "popiersie w kacie");
+    loadOBJ("klockoman.obj", "kwadratowy ludzik");
+    loadOBJ("cylindroman.obj", "chodzacy po kwadracie");
+    setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
+    setModel(myModels[1], 1.0f, -3.0f, 1.0f, 0.0f, 0.0f, 45.0f, 0.0f, 0.5f);
+    setModel(myModels[2], 5.0f, -3.7f, -5.0f, 5.3f);
+    setModel(myModels[3], 2.0f, -2.1f, -2.0f, 0.0f, -5.5f, -90.0f);
+
     /*for(int i = 0; i < vertices.size();i++)
     {
         std::cout<<vertices[i].x<<"\t";
@@ -360,28 +432,27 @@ void initOpenGLProgram(GLFWwindow* window) {
     }*/
     macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 1;
     //drawMatrix();
-    displayTrigonometrics();
+    //displayTrigonometrics();
 
 	//************Tutaj umieszczaj kod, który należy wykonać raz, na początku programu************
    // glClearColor(0.12,0.4,0,1);
     glClearColor(0,1,1,1); // kolor tla
 
-    float diff[] = {1,1,1,1};
-    float spec[] = {1,1,1,1};
+    float diff[] = {0.5f,0.5f,0.5f,1.0f};
+    float spec[] = {0.5f,0.5f,0.5f,1.0f};
     float lightPos1[] = {5.0f, height, -5.0f, 1.0f}; // lewy dol na minimapie
     float lightPos2[] = {-5.0f, height, -5.0f, 1.0f}; // lewa gora
     float lightPos3[] = {5.0f, height, 5.0f, 1.0f}; // prawy dol
     float lightPos4[] = {-5.0f, height, 5.0f, 1.0f}; // prawa gora
+    float lightPos5[] = {0.0f, 1.5f, 0.0f,1.0f};// w kamerze
+
 
     glLightModelf(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
     glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
     glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_LIGHT1);
-    glEnable(GL_LIGHT2);
-    glEnable(GL_LIGHT3);
-    glEnable(GL_LIGHT4);
 
+
+    glShadeModel(GL_SMOOTH);//cieniowanie z interpolacją liniową
 
     glLightfv(GL_LIGHT1,GL_AMBIENT,diff);
     glLightfv(GL_LIGHT1,GL_DIFFUSE,spec);
@@ -395,137 +466,74 @@ void initOpenGLProgram(GLFWwindow* window) {
     glLightfv(GL_LIGHT4,GL_AMBIENT,diff);
     glLightfv(GL_LIGHT4,GL_DIFFUSE,spec);
 
+    glLightfv(GL_LIGHT5,GL_AMBIENT,diff);
+    glLightfv(GL_LIGHT5,GL_DIFFUSE,spec);
 
     glLightfv(GL_LIGHT1,GL_POSITION,lightPos1);
     glLightfv(GL_LIGHT2,GL_POSITION,lightPos2);
     glLightfv(GL_LIGHT3,GL_POSITION,lightPos3);
     glLightfv(GL_LIGHT4,GL_POSITION,lightPos4);
+    glLightfv(GL_LIGHT5,GL_POSITION,lightPos5);
+
 
     glEnable(GL_DEPTH_TEST);
     glfwSetKeyCallback(window, key_callback);
 
-    std::vector<unsigned char> image;
-	unsigned width, height;
-	unsigned error;
-	// 0 - podloga
-	error = lodepng::decode(image, width, height, "blue_marble.png");
-	glGenTextures(20,tex); // inicjacja 20 w tablicy
-	glBindTexture(GL_TEXTURE_2D, tex[0]); // wybranie uchwytu
-	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
+//    glEnable(GL_LIGHT0);//domyślne
+//    glEnable(GL_LIGHT1);
+//    glEnable(GL_LIGHT2);
+//    glEnable(GL_LIGHT3);
+//    glEnable(GL_LIGHT4);
+    glEnable(GL_LIGHT5);
 
-    // 1 - sciany
-    glBindTexture(GL_TEXTURE_2D, tex[1]); // wybor drugiego uchwytu
-    image.clear();
-    error = lodepng::decode(image, width, height, "walls.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
+    std::cout << "Textures:" << std::endl;
+    loadTEX("blue_marble.png","podloga");
+    loadTEX("walls.png","sciany");
+    loadTEX("bricks.png","sufit");
+    loadTEX("pic0.png","picture0");
+    loadTEX("pic1.png","picture1");
+    loadTEX("pic2.png","picture2");
+    loadTEX("pic3.png","picture3");
+    loadTEX("pic4.png","picture4");
+    loadTEX("pic5.png","picture5");
+    loadTEX("pic6.png","picture6");
+    loadTEX("pic7.png","picture7");
+    loadTEX("marble.png","popiersie");
+    loadTEX("human1.png","cylinderman");
 
-    // 2 - sufit
-    glBindTexture(GL_TEXTURE_2D, tex[2]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "bricks.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
+    for (int i = 0; i < 241; i++)
+    {
+        walkX.push_back(2 + 1.0*i/40);
+        walkZ.push_back(-2);
+    }
+    for (int i = 0; i < 241; i++)
+    {
+        walkX.push_back(8);
+        walkZ.push_back(-2 - 1.0*i/40);
+    }
+    for (int i = 0; i < 241; i++)
+    {
+        walkX.push_back(8 - 1.0*i/40);
+        walkZ.push_back(-8);
+    }
+    for (int i = 0; i < 241; i++)
+    {
+        walkX.push_back(2);
+        walkZ.push_back(-8 + 1.0*i/40);
+    }
 
-    // 3 - picture0
-    glBindTexture(GL_TEXTURE_2D, tex[3]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic0.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 4 - picture1
-    glBindTexture(GL_TEXTURE_2D, tex[4]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic1.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 5 - picture2
-    glBindTexture(GL_TEXTURE_2D, tex[5]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic2.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 6 - picture3
-    glBindTexture(GL_TEXTURE_2D, tex[6]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic3.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 7 - picture4
-    glBindTexture(GL_TEXTURE_2D, tex[7]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic4.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 8 - picture5
-    glBindTexture(GL_TEXTURE_2D, tex[8]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic5.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 9 - picture6
-    glBindTexture(GL_TEXTURE_2D, tex[9]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic6.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 10 - picture7
-    glBindTexture(GL_TEXTURE_2D, tex[10]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "pic7.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
-
-    // 11 - przyklad textury na modelu ciuchci
-    glBindTexture(GL_TEXTURE_2D, tex[11]);
-    image.clear();
-    error = lodepng::decode(image, width, height, "wall_error.png");
-    glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glEnable(GL_TEXTURE_2D);
 }
 
 //Procedura rysująca zawartość sceny
-void drawScene(GLFWwindow* window, float angle) {
+void drawScene(GLFWwindow* window) {
 	//************Tutaj umieszczaj kod rysujący obraz******************l
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	mat4 M = mat4(1.0f);
+	M = mat4(1.0f);
 //RUCH KAMERY (GRACZA)
 //pozycja startowa
     float tmp = ANGLE*PI/180.0;
-	mat4 V = lookAt(
+    V = lookAt(
     vec3(0.0f, 0.0f, 0.0f),//pozycja oka
     vec3(0.5f, 0.0f, 0.0f),//na co patrzy
     vec3(0.0f, 1.0f, 0.0f)); //wektor w górę
@@ -547,7 +555,7 @@ void drawScene(GLFWwindow* window, float angle) {
 //    Models::torus.drawSolid();
 //    glRectf(0,0,4,4);
 //    glColor3d(0, 0.5, 0.1);
-//    M = mat4(1.0f);
+//    mat4 M = mat4(1.0f);
 //    M = translate(M, vec3(1.0f,0.0f,-1.0f));
 //    M = rotate(M,-angle,vec3(0.0f,0.0f,1.0f) );
 //    glLoadMatrixf(glm::value_ptr(V*M));
@@ -557,528 +565,69 @@ void drawScene(GLFWwindow* window, float angle) {
     M = translate(M, vec3(-0.5f,-3.0f,-0.75f));
     glLoadMatrixf(glm::value_ptr(V*M));
 
-float geomVerticesPicture0[]={
-    9.9f,pictureLowerBound,-6.0f,
-    9.9f,pictureLowerBound,-4.0f,
-    9.9f,pictureUpperBound,-4.0f,
-    9.9f,pictureUpperBound,-6.0f
-};
-float geomVerticesPicture1[]={
-    9.9f,pictureLowerBound,6.0f,
-    9.9f,pictureLowerBound,4.0f,
-    9.9f,pictureUpperBound,4.0f,
-    9.9f,pictureUpperBound,6.0f
-};
-float geomVerticesPicture2[]={
-    -9.9f,pictureLowerBound,-6.0f,
-    -9.9f,pictureLowerBound,-4.0f,
-    -9.9f,pictureUpperBound,-4.0f,
-    -9.9f,pictureUpperBound,-6.0f
-};
-float geomVerticesPicture3[]={
-    -9.9f,pictureLowerBound,6.0f,
-    -9.9f,pictureLowerBound,4.0f,
-    -9.9f,pictureUpperBound,4.0f,
-    -9.9f,pictureUpperBound,6.0f
-};
-float geomVerticesPicture4[]={
-    6.0f,pictureLowerBound,-9.9f,
-    4.0f,pictureLowerBound,-9.9f,
-    4.0f,pictureUpperBound,-9.9f,
-    6.0f,pictureUpperBound,-9.9f
-};
-float geomVerticesPicture5[]={
-    6.0f,pictureLowerBound,9.9f,
-    4.0f,pictureLowerBound,9.9f,
-    4.0f,pictureUpperBound,9.9f,
-    6.0f,pictureUpperBound,9.9f
-};
-float geomVerticesPicture6[]={
-    -6.0f,pictureLowerBound,-9.9f,
-    -4.0f,pictureLowerBound,-9.9f,
-    -4.0f,pictureUpperBound,-9.9f,
-    -6.0f,pictureUpperBound,-9.9f
-};
-float geomVerticesPicture7[]={
-    -6.0f,pictureLowerBound,9.9f,
-    -4.0f,pictureLowerBound,9.9f,
-    -4.0f,pictureUpperBound,9.9f,
-    -6.0f,pictureUpperBound,9.9f
-};
-
-float geomVerticesDoorBarUp[]={
-        -6.5f,barHeight,0.5f,
-        -6.5f,height,0.5f,
-        -3.5f,height,0.5f,
-        -3.5f,barHeight,0.5f, // sciana przod
-
-        -6.5f,barHeight,0.5f,
-        -3.5f,barHeight,0.5f,
-        -3.5f,barHeight,-0.5f,
-        -6.5f,barHeight,-0.5f, // sciana dolna
-
-        -6.5f,barHeight,-0.5f,
-        -3.5f,barHeight,-0.5f,
-        -3.5f,height,-0.5f,
-        -6.5f,height,-0.5f, // sciana tyl
-
-        -6.5f,height,-0.5f,
-        -3.5f,height,-0.5f,
-        -3.5f,height,0.5f,
-        -6.5f,height,0.5f, // sciana lewa
-};
-float geomVerticesDoorBarDown[]={
-        6.5f,barHeight,0.5f,
-        6.5f,height,0.5f,
-        3.5f,height,0.5f,
-        3.5f,barHeight,0.5f, // sciana przod
-
-        6.5f,barHeight,0.5f,
-        3.5f,barHeight,0.5f,
-        3.5f,barHeight,-0.5f,
-        6.5f,barHeight,-0.5f, // sciana dolna
-
-        6.5f,barHeight,-0.5f,
-        3.5f,barHeight,-0.5f,
-        3.5f,height,-0.5f,
-        6.5f,height,-0.5f, // sciana tyl
-
-        6.5f,height,-0.5f,
-        3.5f,height,-0.5f,
-        3.5f,height,0.5f,
-        6.5f,height,0.5f, // sciana lewa
-};
-float geomVerticesDoorBarLeft[]={
-        0.5f,barHeight,-3.5f,
-        0.5f,height,-3.5f,
-        0.5f,height,-6.5f,
-        0.5f,barHeight,-6.5f, // sciana przod
-
-        0.5f,barHeight,-6.5f,
-        0.5f,barHeight,-3.5f,
-        -0.5f,barHeight,-3.5f,
-        -0.5f,barHeight,-6.5f, // sciana dolna
-
-        -0.5f,barHeight,-6.5f,
-        -0.5f,barHeight,-3.5f,
-        -0.5f,height,-3.5f,
-        -0.5f,height,-6.5f, // sciana tyl
-
-        -0.5f,height,-6.5f,
-        -0.5f,height,-3.5f,
-        0.5f,height,-3.5f,
-        0.5f,height,-6.5f, // sciana lewa
-};
-float geomVerticesDoorBarRight[]={
-        0.5f,barHeight,3.5f,
-        0.5f,height,3.5f,
-        0.5f,height,6.5f,
-        0.5f,barHeight,6.5f, // sciana przod
-
-        0.5f,barHeight,6.5f,
-        0.5f,barHeight,3.5f,
-        -0.5f,barHeight,3.5f,
-        -0.5f,barHeight,6.5f, // sciana dolna
-
-        -0.5f,barHeight,6.5f,
-        -0.5f,barHeight,3.5f,
-        -0.5f,height,3.5f,
-        -0.5f,height,6.5f, // sciana tyl
-
-        -0.5f,height,6.5f,
-        -0.5f,height,3.5f,
-        0.5f,height,3.5f,
-        0.5f,height,6.5f, // sciana górna
-};
-float geomVerticesWallsHorizontalInside[]={
-        0.5f,0.0f,-3.5f,
-        0.5f,height,-3.5f,
-        0.5f,height,3.5f,
-        0.5f,0.0f,3.5f, // sciana przod
-
-        0.5f,0.0f,3.5f,
-        0.5f,height,3.5f,
-        -0.5f,height,3.5f,
-        -0.5f,0.0f,3.5f, // sciana prawa
-
-        -0.5f,0.0f,3.5f,
-        -0.5f,height,3.5f,
-        -0.5f,height,-3.5f,
-        -0.5f,0.0f,-3.5f, // sciana tyl
-
-        -0.5f,0.0f,-3.5f,
-        -0.5f,height,-3.5f,
-        0.5f,height,-3.5f,
-        0.5f,0.0f,-3.5f // sciana lewa
-};
-float geomVerticesWallsVerticalInside[]={
-        -3.5f,0.0f,-0.5f,
-        -3.5f,height,-0.5f,
-        -3.5f,height,0.5f,
-        -3.5f,0.0f,0.5f, // sciana przod
-
-        -3.5f,0.0f,0.5f,
-        -3.5f,height,0.5f,
-        3.5f,height,0.5f,
-        3.5f,0.0f,0.5f, // sciana prawa
-
-        3.5f,0.0f,0.5f,
-        3.5f,height,0.5f,
-        3.5f,height,-0.5f,
-        3.5f,0.0f,-0.5f, // sciana tyl
-
-        3.5f,0.0f,-0.5f,
-        3.5f,height,-0.5f,
-        -3.5f,height,-0.5f,
-        -3.5f,0.0f,-0.5f // sciana lewa
-};
-float geomVerticesWallsLeftOutsite[]={
-        0.5f,0.0f,-10.0f,
-        0.5f,height,-10.0f,
-        0.5f,height,-6.5f,
-        0.5f,0.0f,-6.5f, // sciana przod
-
-        0.5f,0.0f,-6.5f,
-        0.5f,height,-6.5f,
-        -0.5f,height,-6.5f,
-        -0.5f,0.0f,-6.5f, // sciana prawa
-
-        -0.5f,0.0f,-6.5f,
-        -0.5f,height,-6.5f,
-        -0.5f,height,-10.0f,
-        -0.5f,0.0f,-10.0f, // sciana tyl
-
-        -0.5f,0.0f,-10.0f,
-        -0.5f,height,-10.0f,
-        0.5f,height,-10.0f,
-        0.5f,0.0f,-10.0f // sciana lewa
-};
-float geomVerticesWallsUpOutsite[]={
-        10.0f,0.0f,-0.5f,
-        10.0f,height,-0.5f,
-        10.0f,height,0.5f,
-        10.0f,0.0f,0.5f, // sciana przod
-
-        10.0f,0.0f,0.5f,
-        10.0f,height,0.5f,
-        6.5f,height,0.5f,
-        6.5f,0.0f,0.5f, // sciana prawa
-
-        6.5f,0.0f,0.5f,
-        6.5f,height,0.5f,
-        6.5f,height,-0.5f,
-        6.5f,0.0f,-0.5f, // sciana tyl
-
-        6.5f,0.0f,-0.5f,
-        6.5f,height,-0.5f,
-        10.0f,height,-0.5f,
-        10.0f,0.0f,-0.5f // sciana lewa
-};
-float geomVerticesWallsRightOutsite[]={
-        -0.5f,0.0f,10.0f,
-        -0.5f,height,10.0f,
-        -0.5f,height,6.5f,
-        -0.5f,0.0f,6.5f, // sciana przod
-
-        -0.5f,0.0f,6.5f,
-        -0.5f,height,6.5f,
-        0.5f,height,6.5f,
-        0.5f,0.0f,6.5f, // sciana prawa
-
-        0.5f,0.0f,6.5f,
-        0.5f,height,6.5f,
-        0.5f,height,10.0f,
-        0.5f,0.0f,10.0f, // sciana tyl
-
-        0.5f,0.0f,10.0f,
-        0.5f,height,10.0f,
-        -0.5f,height,10.0f,
-        -0.5f,0.0f,10.0f // sciana lewa
-};
-float geomVerticesWallsDownOutsite[]={
-        -10.0f,0.0f,0.5f,
-        -10.0f,height,0.5f,
-        -10.0f,height,-0.5f,
-        -10.0f,0.0f,-0.5f, // sciana przod
-
-        -10.0f,0.0f,-0.5f,
-        -10.0f,height,-0.5f,
-        -6.5f,height,-0.5f,
-        -6.5f,0.0f,-0.5f, // sciana prawa
-
-        -6.5f,0.0f,-0.5f,
-        -6.5f,height,-0.5f,
-        -6.5f,height,0.5f,
-        -6.5f,0.0f,0.5f, // sciana tyl
-
-        -6.5f,0.0f,0.5f,
-        -6.5f,height,0.5f,
-        -10.0f,height,0.5f,
-        -10.0f,0.0f,0.5f // sciana lewa
-};
-float geomVerticesWalls[]={
-        -10.0f,0.0f,-10.0f,
-        -10.0f,height,-10.0f,
-        10.0f,height,-10.0f,
-        10.0f,0.0f,-10.0f, // sciana przod
-
-        10.0f,0.0f,-10.0f,
-        10.0f,height,-10.0f,
-        10.0f,height,10.0f,
-        10.0f,0.0f,10.0f, // sciana prawa
-
-        10.0f,0.0f,10.0f,
-        10.0f,height,10.0f,
-        -10.0f,height,10.0f,
-        -10.0f,0.0f,10.0f, // sciana tyl
-
-        -10.0f,0.0f,10.0f,
-        -10.0f,height,10.0f,
-        -10.0f,height,-10.0f,
-        -10.0f,0.0f,-10.0f // sciana lewa
-};
-float geomVerticesFloor[]={
-        -10.0f,0.0f,-10.0f,
-        10.0f,0.0f,-10.0f,
-        10.0f,0.0f,10.0f,
-        -10.0f,0.0f,10.0f // podloga
-};
-
-float geomVerticesCeiling[]={
-        -10.0f,height,-10.0f,
-        10.0f,height,-10.0f,
-        10.0f,height,10.0f,
-        -10.0f,height,10.0f // sufit
-};
-float geomTexCoordsPictures[]={ // 1:1 dla obrazow
-    0,1, 1,1, 1,0, 0,0
-};
-
-float geomTexCoordsRepeat[]={ // 1:20 dla podlogi i sufitu
-    0,20, 20,20, 20,0, 0,0
-};
-
-float geomTexWallCoords[]={ // 1:10 dla scian
-    0,10, 10,10, 10,0, 0,0,
-    0,10, 10,10, 10,0, 0,0,
-    0,10, 10,10, 10,0, 0,0,
-    0,10, 10,10, 10,0, 0,0
-};
-
-int geomVertexWallsCount = 16;
-int geomVertexFloorCount = 4;
 
 //glColor3d(0, 0.5, 0.3); // kolor rysowania
 
+///OBRAZY
 //OBRAZ NUMER 0
-glBindTexture(GL_TEXTURE_2D,tex[3]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture0);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(3, GL_QUADS, geomVerticesPicture0, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 1
-glBindTexture(GL_TEXTURE_2D,tex[4]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture1);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(4, GL_QUADS, geomVerticesPicture1, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 2
-glBindTexture(GL_TEXTURE_2D,tex[5]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture2);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(5, GL_QUADS, geomVerticesPicture2, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 3
-glBindTexture(GL_TEXTURE_2D,tex[6]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture3);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(6, GL_QUADS, geomVerticesPicture3, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 4
-glBindTexture(GL_TEXTURE_2D,tex[7]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture4);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(7, GL_QUADS, geomVerticesPicture4, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 5
-glBindTexture(GL_TEXTURE_2D,tex[8]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture5);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(8, GL_QUADS, geomVerticesPicture5, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 6
-glBindTexture(GL_TEXTURE_2D,tex[9]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture6);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(9, GL_QUADS, geomVerticesPicture6, geomTexCoordsPictures, geomVertexFloorCount);
 //OBRAZ NUMER 7
-glBindTexture(GL_TEXTURE_2D,tex[10]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesPicture7);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsPictures);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(10, GL_QUADS, geomVerticesPicture7, geomTexCoordsPictures, geomVertexFloorCount);
 
+
+///SCIANY
 //ŚCIANY GŁÓWNE
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWalls);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWalls, geomTexWallCoords, geomVertexWallsCount);
 //ŚCIANA ZEWNĘTRZNA MAŁA LEWA
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWallsLeftOutsite);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWallsLeftOutsite, geomTexWallCoords, geomVertexWallsCount);
 //ŚCIANA ZEWNĘTRZNA MAŁA PRAWA
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWallsRightOutsite);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWallsRightOutsite, geomTexWallCoords, geomVertexWallsCount);
 //ŚCIANA ZEWNĘTRZNA MAŁA GÓRNA
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWallsUpOutsite);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWallsUpOutsite, geomTexWallCoords, geomVertexWallsCount);
 //ŚCIANA ZEWNĘTRZNA MAŁA DOLNA
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWallsDownOutsite);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWallsDownOutsite, geomTexWallCoords, geomVertexWallsCount);
 //ŚCIANA WEWNETRZNA MAŁA POZIOMA
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWallsHorizontalInside);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWallsHorizontalInside, geomTexWallCoords, geomVertexWallsCount);
 //ŚCIANA WEWNETRZNA MAŁA PIONOWA
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesWallsVerticalInside);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesWallsVerticalInside, geomTexWallCoords, geomVertexWallsCount);
 //BELKA NAD LEWYM PRZEJSCIEM
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesDoorBarLeft);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesDoorBarLeft, geomTexWallCoords, geomVertexWallsCount);
 //BELKA NAD PRAWYM PRZEJSCIEM
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesDoorBarRight);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesDoorBarRight, geomTexWallCoords, geomVertexWallsCount);
 //BELKA NAD GORNYM PRZEJSCIEM
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesDoorBarUp);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesDoorBarUp, geomTexWallCoords, geomVertexWallsCount);
 //BELKA NAD DOLNYM PRZEJSCIEM
-glBindTexture(GL_TEXTURE_2D,tex[1]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0, geomVerticesDoorBarDown);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexWallCoords);
-glDrawArrays(GL_QUADS,0,geomVertexWallsCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(1, GL_QUADS, geomVerticesDoorBarDown, geomTexWallCoords, geomVertexWallsCount);
 
 //SUFIT
-glBindTexture(GL_TEXTURE_2D,tex[2]);
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,GL_REPEAT);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer( 3, GL_FLOAT, 0,  geomVerticesCeiling);
-glTexCoordPointer( 2, GL_FLOAT, 0,  geomTexCoordsRepeat);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(2, GL_QUADS, geomVerticesCeiling, geomTexCoordsRepeat, geomVertexFloorCount);
 
 //PODLOGA
-glBindTexture(GL_TEXTURE_2D,tex[0]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, geomVerticesFloor);
-glTexCoordPointer( 2, GL_FLOAT, 0, geomTexCoordsRepeat);
-glDrawArrays(GL_QUADS,0,geomVertexFloorCount);
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-//MODEL CIUCHCI
-float * wsk_vertices = glm::value_ptr(vertices[0]);
-float * wsk_uvs = glm::value_ptr(uvs[0]);
-float * wsk_normals = glm::value_ptr(normals[0]); // tylko do cieniowania
-glBindTexture(GL_TEXTURE_2D,tex[11]);
-glEnableClientState(GL_VERTEX_ARRAY);
-glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-glVertexPointer(3, GL_FLOAT, 0, wsk_vertices);
-glTexCoordPointer( 2, GL_FLOAT, 0, wsk_uvs);
-glTranslatef(5,1,-5); // raczej niedozwolone
-glDrawArrays(GL_TRIANGLES, 0, vertices.size());
-glDisableClientState(GL_VERTEX_ARRAY);
-glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+useTEX(0, GL_QUADS, geomVerticesFloor, geomTexCoordsRepeat, geomVertexFloorCount);
 
 
+///MODELE
+//MODEL OKRAGLEGO CZLOWIEKA
+useModel(12, GL_TRIANGLES, myModels[0]);
+//MODEL POSĄGU
+useModel(11, GL_TRIANGLES, myModels[1]);
+//MODEL KWADRATOWEGO CZLOWIEKA
+useModel(8, GL_TRIANGLES, myModels[2]);
+//MODEL CHODZACY PO KWADRACIE
+useModel(12, GL_TRIANGLES, myModels[3]);
+//std::cout <<  myModels[2].posX << "\t" <<  myModels[2].posY << "\t" << myModels[2].posZ << std::endl;
 
 //glDisable(GL_TEXTURE_2D);
     glfwSwapBuffers(window); // zawsze ostatnie
@@ -1114,14 +663,45 @@ int main(void)
 
 	initOpenGLProgram(window); //Operacje inicjujące
 
-	float angle=0;
     glfwSetTime(0);
 	//Główna pętla
+	int k = 0;
 	while (!glfwWindowShouldClose(window)) //Tak długo jak okno nie powinno zostać zamknięte
 	{
-	    //angle+=speed*glfwGetTime();
-        glfwSetTime(0);
-		drawScene(window, angle); //Wykonaj procedurę rysującą
+	    k = k % 968;
+
+	    //MODEL0
+	    myModels[0].angleY = speed*glfwGetTime();
+	    myModels[0].posX =  myModels[0].ray*cos(glfwGetTime());
+	    myModels[0].posZ =  myModels[0].ray*sin(glfwGetTime());
+	    //std::cout<< myModels[0].posX << "\t" << myModels[0].posZ << "\n";
+        //glfwSetTime(0);
+
+        //MODEL2
+        myModels[2].angleY -= 0.15; // trzeba zwiazac to z katem obrotu/przebyta trasa, bo liczba iteracji bedzie miala wplyw
+	    myModels[2].posX =  -myModels[2].ray*cos(glfwGetTime()/5);
+	    myModels[2].posZ =  -myModels[2].ray*sin(glfwGetTime()/5);
+        if(k % 22 < 11)
+        myModels[2].angleX += 0.5;
+        else
+        myModels[2].angleX -= 0.5;
+
+        //MODEL3
+        if (k % 242 == 0)
+        {
+            myModels[3].angleY = int(90 + myModels[3].angleY) % 360;
+        }
+
+        if(k % 22 < 11)
+        myModels[3].angleX += 1;
+        else
+        myModels[3].angleX -= 1;
+
+        myModels[3].posX = walkX[k];
+        myModels[3].posZ = walkZ[k];
+
+        k++;
+		drawScene(window); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.
 	}
 
