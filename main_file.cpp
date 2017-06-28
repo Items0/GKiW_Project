@@ -419,10 +419,14 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadOBJ("monument.obj", "popiersie w kacie");
     loadOBJ("klockoman.obj", "kwadratowy ludzik");
     loadOBJ("cylindroman.obj", "chodzacy po kwadracie");
+    loadOBJ("podest.obj", "podest pod rzezbe");
+    loadOBJ("rzezba.obj","powyginana rzezba");
     setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
     setModel(myModels[1], 1.0f, -3.0f, 1.0f, 0.0f, 0.0f, 45.0f, 0.0f, 0.5f);
     setModel(myModels[2], 5.0f, -3.7f, -5.0f, 5.3f);
     setModel(myModels[3], 2.0f, -2.1f, -2.0f, 0.0f, -5.5f, -90.0f);
+    setModel(myModels[4], -8.5f, -3.0f, -9.0f, 0.0f, 0.0f, -45.f);
+    setModel(myModels[5], -8.5f, -3.25f,-9.0f, 0.0f, 0.0f, -45.f);
 
     /*for(int i = 0; i < vertices.size();i++)
     {
@@ -479,11 +483,11 @@ void initOpenGLProgram(GLFWwindow* window) {
     glEnable(GL_DEPTH_TEST);
     glfwSetKeyCallback(window, key_callback);
 
-//    glEnable(GL_LIGHT0);//domyślne
-//    glEnable(GL_LIGHT1);
-//    glEnable(GL_LIGHT2);
-//    glEnable(GL_LIGHT3);
-//    glEnable(GL_LIGHT4);
+    glEnable(GL_LIGHT0);//domyślne
+    glEnable(GL_LIGHT1);
+    glEnable(GL_LIGHT2);
+    glEnable(GL_LIGHT3);
+    glEnable(GL_LIGHT4);
     glEnable(GL_LIGHT5);
 
     std::cout << "Textures:" << std::endl;
@@ -500,6 +504,8 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadTEX("pic7.png","picture7");
     loadTEX("marble.png","popiersie");
     loadTEX("human1.png","cylinderman");
+    loadTEX("metal.png", "na rzezbie");
+    loadTEX("gold.png", "podest");
 
     for (int i = 0; i < 241; i++)
     {
@@ -627,6 +633,10 @@ useModel(11, GL_TRIANGLES, myModels[1]);
 useModel(8, GL_TRIANGLES, myModels[2]);
 //MODEL CHODZACY PO KWADRACIE
 useModel(12, GL_TRIANGLES, myModels[3]);
+//PODEST
+useModel(14, GL_TRIANGLES, myModels[4]);
+//RZEZBA
+useModel(13, GL_TRIANGLES, myModels[5]);
 //std::cout <<  myModels[2].posX << "\t" <<  myModels[2].posY << "\t" << myModels[2].posZ << std::endl;
 
 //glDisable(GL_TEXTURE_2D);
