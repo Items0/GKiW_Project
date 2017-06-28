@@ -423,14 +423,18 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadOBJ("rzezba.obj", "powyginana rzezba");
     loadOBJ("warrior.obj", "wojownik1");
     loadOBJ("warrior.obj", "wojownik2");
+    loadOBJ("head.obj", "glowa");
+
+
     setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
     setModel(myModels[1], 1.0f, -3.0f, 1.0f, 0.0f, 0.0f, 45.0f, 0.0f, 0.5f);
     setModel(myModels[2], 5.0f, -3.7f, -5.0f, 5.3f);
     setModel(myModels[3], 2.0f, -2.1f, -2.0f, 0.0f, -5.5f, -90.0f);
     setModel(myModels[4], -8.5f, -3.0f, -9.0f, 0.0f, 0.0f, -45.0f);
     setModel(myModels[5], -8.5f, -3.25f,-9.0f, 0.0f, 0.0f, -45.0f);
-    setModel(myModels[6], -2.5f, -3.25f,-9.0f, 0.0f, 0.0f, -45.0f);
-    setModel(myModels[7], -4.0f, -3.25f,-9.0f, 0.0f, 0.0f, -15.0f, 0.0f, 0.8f);
+    setModel(myModels[6], -3.0f, -3.25f,-9.0f, 0.0f, 0.0f, -20.0f);
+    setModel(myModels[7], -4.5f, -3.25f,-9.0f, 0.0f, 0.0f, -45.0f, 0.0f, 0.8f);
+    setModel(myModels[8], 8.1f, -3.25f,-9.1f, 0.0f, 0.0f, -45.0f);
     /*for(int i = 0; i < vertices.size();i++)
     {
         std::cout<<vertices[i].x<<"\t";
@@ -513,6 +517,7 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadTEX("human3_kw.png","kwadratoman");
     loadTEX("stone.png","warrior1");
     loadTEX("brown.png","warrior2");
+    loadTEX("head.png","glowa");
 
     for (int i = 0; i < 241; i++)
     {
@@ -648,6 +653,8 @@ useModel(13, GL_TRIANGLES, myModels[5]);
 useModel(17, GL_TRIANGLES, myModels[6]);
 //WOJOWNIK 2
 useModel(18, GL_TRIANGLES, myModels[7]);
+//GLOWA
+useModel(19, GL_TRIANGLES, myModels[8]);
 //std::cout <<  myModels[2].posX << "\t" <<  myModels[2].posY << "\t" << myModels[2].posZ << std::endl;
 
 //glDisable(GL_TEXTURE_2D);
