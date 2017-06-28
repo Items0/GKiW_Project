@@ -42,8 +42,11 @@ using namespace glm;
 const int tex_size = 50; // liczba textur
 GLuint tex[tex_size]; // uchwyt do tekstur
 
-std::vector<float> walkX;
-std::vector<float> walkZ;
+std::vector<float> walk0X;
+std::vector<float> walk0Z;
+
+std::vector<float> walk3X;
+std::vector<float> walk3Z;
 
 //Przetrzymywanie wierzcholkow modelu
 struct model{
@@ -76,6 +79,7 @@ void error_callback(int error, const char* description) {
 
 */
 //8 ściana, 0 można się poruszać, 1 gracz, 2 bot
+//    x > 0, z > 0                                                  x > 0, z < 0
 int macierzRuchu[20][20] = {{8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8},//0
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,8,8,8},//1
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,8,8,8},//2
@@ -96,7 +100,7 @@ int macierzRuchu[20][20] = {{8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8},//0
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,8,8,8,8},//17
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,8,8,8,8,8},//18
                             {8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8}};//19
-
+//       x < 0, z > 0                                                           x < 0, z < 0
 float speed=3.14;
 float x_camera_position = -5; //startowa pozycja X
 float z_camera_position = 6; //startowa pozycja Z
@@ -427,7 +431,7 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadOBJ("rama.obj", "herb");
     loadOBJ("zbroja.obj", "zbroja");
 
-    setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
+    setModel(myModels[0], -2.0f, -2.0f, -2.0f, 5.3f, -5.5f, -90.0f);
     setModel(myModels[1], 1.0f, -3.0f, 1.0f, 0.0f, 0.0f, 45.0f, 0.0f, 0.5f);
     setModel(myModels[2], 5.0f, -3.7f, -5.0f, 5.3f);
     setModel(myModels[3], 2.0f, -2.1f, -2.0f, 0.0f, -5.5f, -90.0f);
@@ -520,26 +524,48 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadTEX("rama.png","rama na zbroje");
     loadTEX("zbroja.png","zbroja");
 
-    //ruch ludków
-    for (int i = 0; i < 241; i++)
+    //ruch modelu nr0
+    for (int i = 0; i < 201; i++)
     {
-        walkX.push_back(2 + 1.0*i/40);
-        walkZ.push_back(-2);
+        walk0X.push_back(-2 - 1.0*i/40);
+        walk0Z.push_back(-2);
     }
     for (int i = 0; i < 241; i++)
     {
-        walkX.push_back(8);
-        walkZ.push_back(-2 - 1.0*i/40);
+        walk0X.push_back(-7);
+        walk0Z.push_back(-2 - 1.0*i/40);
+    }
+    for (int i = 0; i < 201; i++)
+    {
+        walk0X.push_back(-7 + 1.0*i/40);
+        walk0Z.push_back(-8);
     }
     for (int i = 0; i < 241; i++)
     {
-        walkX.push_back(8 - 1.0*i/40);
-        walkZ.push_back(-8);
+        walk0X.push_back(-2);
+        walk0Z.push_back(-8 + 1.0*i/40);
+    }
+
+    //ruch modelu nr3
+    for (int i = 0; i < 241; i++)
+    {
+        walk3X.push_back(2 + 1.0*i/40);
+        walk3Z.push_back(-2);
     }
     for (int i = 0; i < 241; i++)
     {
-        walkX.push_back(2);
-        walkZ.push_back(-8 + 1.0*i/40);
+        walk3X.push_back(8);
+        walk3Z.push_back(-2 - 1.0*i/40);
+    }
+    for (int i = 0; i < 241; i++)
+    {
+        walk3X.push_back(8 - 1.0*i/40);
+        walk3Z.push_back(-8);
+    }
+    for (int i = 0; i < 241; i++)
+    {
+        walk3X.push_back(2);
+        walk3Z.push_back(-8 + 1.0*i/40);
     }
 
 }
@@ -686,14 +712,24 @@ int main(void)
     glfwSetTime(0);
 	//Główna pętla
 	int k = 0;
+	int p = 0;
 	while (!glfwWindowShouldClose(window)) //Tak długo jak okno nie powinno zostać zamknięte
 	{
 	    k = k % 968;
-
+        p = p % 884;
 	    //MODEL0
-	    myModels[0].angleY = speed*glfwGetTime();
-	    myModels[0].posX =  myModels[0].ray*cos(glfwGetTime());
-	    myModels[0].posZ =  myModels[0].ray*sin(glfwGetTime());
+	    //myModels[0].angleY = speed*glfwGetTime();
+        if (p == 0 ||  p == 201 || p == 442 || p == 643)
+        {
+            myModels[0].angleY = int(myModels[0].angleY - 90) % 360;
+        }
+        if(p % 26 < 13)
+        myModels[0].angleX += 1;
+        else
+        myModels[0].angleX -= 1;
+        myModels[0].posX =  walk0X[p];
+	    myModels[0].posZ =  walk0Z[p];
+
 	    //std::cout<< myModels[0].posX << "\t" << myModels[0].posZ << "\n";
         //glfwSetTime(0);
 
@@ -717,10 +753,11 @@ int main(void)
         else
         myModels[3].angleX -= 1;
 
-        myModels[3].posX = walkX[k];
-        myModels[3].posZ = walkZ[k];
+        myModels[3].posX = walk3X[k];
+        myModels[3].posZ = walk3Z[k];
 
         k++;
+        p++;
 		drawScene(window); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.
 	}
