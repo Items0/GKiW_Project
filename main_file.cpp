@@ -83,18 +83,18 @@ int macierzRuchu[20][20] = {{8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8},//0
                             {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8},//4
                             {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8},//5
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//6
-                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//7
-                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//8
+                            {8,0,0,0,0,0,0,8,8,8,8,0,0,0,0,0,0,0,0,8},//7
+                            {8,0,0,0,0,0,0,8,8,8,8,0,0,0,0,0,0,0,0,8},//8
                             {8,8,8,8,0,0,8,8,8,8,8,8,8,8,0,0,8,8,8,8},//9 połowa
                             {8,8,8,8,0,0,8,8,8,8,8,8,8,8,0,0,8,8,8,8},//10
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//11
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//12
                             {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//13
                             {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8},//14
-                            {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8},//15
-                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//16
-                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//17
-                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,8},//18
+                            {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8},//15
+                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,8,8,8},//16
+                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,8,8,8,8},//17
+                            {8,0,0,0,0,0,0,0,0,8,8,0,0,0,0,8,8,8,8,8},//18
                             {8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8}};//19
 
 float speed=3.14;
@@ -113,12 +113,12 @@ void loadTEX(std::string name, std::string description)
         }
         std::vector<unsigned char> image;
         unsigned width, height;
-        unsigned error = lodepng::decode(image, width, height, "textures/" + name);
+        unsigned error = lodepng::decode(image, width, height, "textures/" + name);//wczytanie tektury
         glBindTexture(GL_TEXTURE_2D, tex[amount]);
         glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*) image.data());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);//rodzaj, rodzaj tektury
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_TEXTURE_2D);//włączenie
         if (error == 0)
         {
             std::cout << amount<< "\t"  << name << "\t\t--" << description << std::endl;
@@ -263,7 +263,7 @@ void useModel(int textureNumber,  GLenum mode, model &Model)
 
     glDisableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    //glDisableClientState( GL_NORMAL_ARRAY ); cieniowanie
+    glDisableClientState( GL_NORMAL_ARRAY );// cieniowanie
 }
 
 void drawMatrix(){//minimapa w konsoli
@@ -358,14 +358,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if(action == GLFW_REPEAT){
         if (key == GLFW_KEY_LEFT){
             if( ANGLE == 0.0){
-                ANGLE = 350.0;
+                ANGLE = 358.0;
             }else{
                 ANGLE -= 2.0;
             }
         }
         if (key == GLFW_KEY_RIGHT){
             if( ANGLE == 360.0){
-                ANGLE = 10.0;
+                ANGLE = 2.0;
             }else{
                 ANGLE += 2.0;
             }
@@ -427,7 +427,6 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadOBJ("rama.obj", "herb");
     loadOBJ("zbroja.obj", "zbroja");
 
-
     setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
     setModel(myModels[1], 1.0f, -3.0f, 1.0f, 0.0f, 0.0f, 45.0f, 0.0f, 0.5f);
     setModel(myModels[2], 5.0f, -3.7f, -5.0f, 5.3f);
@@ -446,29 +445,24 @@ void initOpenGLProgram(GLFWwindow* window) {
         std::cout<<vertices[i].z<<"\n";
     }*/
     macierzRuchu[matrixPosition(x_camera_position)][matrixPosition(z_camera_position)] = 1;
-    //drawMatrix();
-    //displayTrigonometrics();
 
-	//************Tutaj umieszczaj kod, który należy wykonać raz, na początku programu************
-   // glClearColor(0.12,0.4,0,1);
     glClearColor(0,1,1,1); // kolor tla
 
-    float diff[] = {0.5f,0.5f,0.5f,1.0f};
-    float spec[] = {0.5f,0.5f,0.5f,1.0f};
-    float lightPos1[] = {5.0f, height, -5.0f, 1.0f}; // lewy dol na minimapie
-    float lightPos2[] = {-5.0f, height, -5.0f, 1.0f}; // lewa gora
-    float lightPos3[] = {5.0f, height, 5.0f, 1.0f}; // prawy dol
-    float lightPos4[] = {-5.0f, height, 5.0f, 1.0f}; // prawa gora
-    float lightPos5[] = {0.0f, 1.5f, 0.0f,1.0f};// w kamerze
-
+    float diff[] = {0.6f,0.6f,0.6f,1.0f};
+    float spec[] = {0.3f,0.3f,0.3f,1.0f};
+    //światła wokół kamery i lekko pod nią
+    float lightPos1[] = {1.0f, height-1.0f, -1.0f, 0.0f};
+    float lightPos2[] = {-1.0f, height-1.0f, -1.0f, 0.0f};
+    float lightPos3[] = {1.0f, height-1.0f, 1.0f, 0.0f};
+    float lightPos4[] = {-1.0f, height-1.0f, 1.0f, 0.0f};
+    float lightPos5[] = {0.0f, 1.5f, 0.0f,0.0f};
 
     glLightModelf(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
     glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
     glEnable(GL_LIGHTING);
 
-
     glShadeModel(GL_SMOOTH);//cieniowanie z interpolacją liniową
-
+//ustawienie światła otoczenia i rozproszonego
     glLightfv(GL_LIGHT1,GL_AMBIENT,diff);
     glLightfv(GL_LIGHT1,GL_DIFFUSE,spec);
 
@@ -483,7 +477,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 
     glLightfv(GL_LIGHT5,GL_AMBIENT,diff);
     glLightfv(GL_LIGHT5,GL_DIFFUSE,spec);
-
+//ustawienie pozycji świateł
     glLightfv(GL_LIGHT1,GL_POSITION,lightPos1);
     glLightfv(GL_LIGHT2,GL_POSITION,lightPos2);
     glLightfv(GL_LIGHT3,GL_POSITION,lightPos3);
@@ -494,7 +488,8 @@ void initOpenGLProgram(GLFWwindow* window) {
     glEnable(GL_DEPTH_TEST);
     glfwSetKeyCallback(window, key_callback);
 
-    glEnable(GL_LIGHT0);//domyślne
+ //   glEnable(GL_LIGHT0);//domyślne
+
     glEnable(GL_LIGHT1);
     glEnable(GL_LIGHT2);
     glEnable(GL_LIGHT3);
@@ -525,8 +520,7 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadTEX("rama.png","rama na zbroje");
     loadTEX("zbroja.png","zbroja");
 
-
-
+    //ruch ludków
     for (int i = 0; i < 241; i++)
     {
         walkX.push_back(2 + 1.0*i/40);
@@ -558,7 +552,7 @@ void drawScene(GLFWwindow* window) {
 	M = mat4(1.0f);
 //RUCH KAMERY (GRACZA)
 //pozycja startowa
-    float tmp = ANGLE*PI/180.0;
+    float tmp = ANGLE*PI/180.0;//kąt obrotu w radianach
     V = lookAt(
     vec3(0.0f, 0.0f, 0.0f),//pozycja oka
     vec3(0.5f, 0.0f, 0.0f),//na co patrzy
@@ -568,31 +562,16 @@ void drawScene(GLFWwindow* window) {
     V = translate(V, vec3(x_camera_position, 0, z_camera_position));// przesunięcie kamery do pozycji aktualnej
 //*************************
 
-
     mat4 P = perspective(50*PI/180, 1.0f, 1.0f, 50.0f);
     glColor3d(1, 0.5, 0.1); // kolor rysowania
     glMatrixMode(GL_PROJECTION);
     glLoadMatrixf(glm::value_ptr(P));
     glMatrixMode(GL_MODELVIEW);
-//    M = translate(M, vec3(1.0f,0.0f,1.0f));
-//    M = rotate(M,angle,vec3(0.0f,0.0f,1.0f) );
-//    glLoadMatrixf(glm::value_ptr(V*M));
-
-//    Models::torus.drawSolid();
-//    glRectf(0,0,4,4);
-//    glColor3d(0, 0.5, 0.1);
-//    mat4 M = mat4(1.0f);
-//    M = translate(M, vec3(1.0f,0.0f,-1.0f));
-//    M = rotate(M,-angle,vec3(0.0f,0.0f,1.0f) );
-//    glLoadMatrixf(glm::value_ptr(V*M));
-//    Models::torus.drawSolid();
 
     M = mat4(1.0f);
-    M = translate(M, vec3(-0.5f,-3.0f,-0.75f));
+    M = translate(M, vec3(-0.3f,-3.0f,-0.3f));
     glLoadMatrixf(glm::value_ptr(V*M));
 
-
-//glColor3d(0, 0.5, 0.3); // kolor rysowania
 
 ///OBRAZY
 //OBRAZ NUMER 0
@@ -667,6 +646,7 @@ useModel(19, GL_TRIANGLES, myModels[8]);
 useModel(20, GL_TRIANGLES, myModels[9]);
 //ZBROJA NA RAMIE
 useModel(21, GL_TRIANGLES, myModels[10]);
+
 //std::cout <<  myModels[2].posX << "\t" <<  myModels[2].posY << "\t" << myModels[2].posZ << std::endl;
 
 //glDisable(GL_TEXTURE_2D);
