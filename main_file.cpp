@@ -424,6 +424,8 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadOBJ("warrior.obj", "wojownik1");
     loadOBJ("warrior.obj", "wojownik2");
     loadOBJ("head.obj", "glowa");
+    loadOBJ("rama.obj", "herb");
+    loadOBJ("zbroja.obj", "zbroja");
 
 
     setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
@@ -435,6 +437,8 @@ void initOpenGLProgram(GLFWwindow* window) {
     setModel(myModels[6], -3.0f, -3.25f,-9.0f, 0.0f, 0.0f, -20.0f);
     setModel(myModels[7], -4.5f, -3.25f,-9.0f, 0.0f, 0.0f, -45.0f, 0.0f, 0.8f);
     setModel(myModels[8], 8.1f, -3.25f,-9.1f, 0.0f, 0.0f, -45.0f);
+    setModel(myModels[9], 0.1f, -2.6f,-9.0f, 0.0f, 0.0f, 180.0f);
+    setModel(myModels[10], 0.1f, -2.3f,-9.0f, 0.0f, 0.0f, 180.0f);
     /*for(int i = 0; i < vertices.size();i++)
     {
         std::cout<<vertices[i].x<<"\t";
@@ -518,6 +522,10 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadTEX("stone.png","warrior1");
     loadTEX("brown.png","warrior2");
     loadTEX("head.png","glowa");
+    loadTEX("rama.png","rama na zbroje");
+    loadTEX("zbroja.png","zbroja");
+
+
 
     for (int i = 0; i < 241; i++)
     {
@@ -655,6 +663,10 @@ useModel(17, GL_TRIANGLES, myModels[6]);
 useModel(18, GL_TRIANGLES, myModels[7]);
 //GLOWA
 useModel(19, GL_TRIANGLES, myModels[8]);
+//RAMA
+useModel(20, GL_TRIANGLES, myModels[9]);
+//ZBROJA NA RAMIE
+useModel(21, GL_TRIANGLES, myModels[10]);
 //std::cout <<  myModels[2].posX << "\t" <<  myModels[2].posY << "\t" << myModels[2].posZ << std::endl;
 
 //glDisable(GL_TEXTURE_2D);
