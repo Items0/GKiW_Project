@@ -415,12 +415,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 //Procedura inicjująca
 void initOpenGLProgram(GLFWwindow* window) {
     std::cout << "Models: " << std::endl;
-    loadOBJ("cylindroman.obj", "latajacy dookola");
+    loadOBJ("cylindroman.obj", "latajacy dookola1");
     loadOBJ("monument.obj", "popiersie w kacie");
     loadOBJ("klockoman.obj", "kwadratowy ludzik");
-    loadOBJ("cylindroman.obj", "chodzacy po kwadracie");
+    loadOBJ("cylindroman.obj", "chodzacy po kwadracie2");
     loadOBJ("podest.obj", "podest pod rzezbe");
-    loadOBJ("rzezba.obj","powyginana rzezba");
+    loadOBJ("rzezba.obj", "powyginana rzezba");
     setModel(myModels[0], 5.0f, -2.0f, -5.0f, 5.3f, -5.5f, 180.0f);
     setModel(myModels[1], 1.0f, -3.0f, 1.0f, 0.0f, 0.0f, 45.0f, 0.0f, 0.5f);
     setModel(myModels[2], 5.0f, -3.7f, -5.0f, 5.3f);
@@ -503,9 +503,10 @@ void initOpenGLProgram(GLFWwindow* window) {
     loadTEX("pic6.png","picture6");
     loadTEX("pic7.png","picture7");
     loadTEX("marble.png","popiersie");
-    loadTEX("human1.png","cylinderman");
+    loadTEX("human1.png","cylinderman1");
     loadTEX("metal.png", "na rzezbie");
     loadTEX("gold.png", "podest");
+    loadTEX("human2.png","cylinderman2");
 
     for (int i = 0; i < 241; i++)
     {
@@ -632,7 +633,7 @@ useModel(11, GL_TRIANGLES, myModels[1]);
 //MODEL KWADRATOWEGO CZLOWIEKA
 useModel(8, GL_TRIANGLES, myModels[2]);
 //MODEL CHODZACY PO KWADRACIE
-useModel(12, GL_TRIANGLES, myModels[3]);
+useModel(15, GL_TRIANGLES, myModels[3]);
 //PODEST
 useModel(14, GL_TRIANGLES, myModels[4]);
 //RZEZBA
